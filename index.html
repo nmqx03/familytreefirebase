@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sơ Đồ Phả Hệ Họ Nguyễn</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="images/android-icon-36x36.png">
+    
+    <!-- Firebase SDK (Compat version) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    
+</head>
+<body>
+    <!-- Sync Indicator (ẩn status dot) -->
+    <div class="sync-indicator" id="syncIndicator" style="display: none; position: fixed; bottom: 20px; right: 20px; padding: 10px 20px; background: #4CAF50; color: white; border-radius: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); font-size: 14px; z-index: 999;">
+        ✓ Đã đồng bộ
+    </div>
+    <div class="container">
+        <header class="header">
+            <h1>Sơ Đồ Phả Hệ Họ Nguyễn</h1>
+            <p class="subtitle"></p>
+        </header>
+        
+        <!-- Canvas xem phả hệ -->
+        <div class="tree-container">
+            <div class="zoom-controls">
+                <button id="undoBtn" title="Hoàn tác (Ctrl+Z)" style="display: none;">↶</button>
+                <button id="redoBtn" title="Làm lại (Ctrl+Y)" style="display: none;">↷</button>
+                <button id="zoomIn">+</button>
+                <button id="zoomReset">Reset</button>
+                <button id="zoomOut">−</button>
+            </div>
+            <div id="treeCanvas" class="tree-canvas"></div>
+        </div>
+
+        <!-- Tìm kiếm -->
+        <div class="form-section">
+            <h2>🔍 Tìm Kiếm Người</h2>
+            <div class="form-group">
+                <label for="searchName">Tên người cần tìm:</label>
+                <input type="text" id="searchName" placeholder="Nhập tên để tìm kiếm..." autocomplete="off">
+            </div>
+            <div id="searchResults"></div>
+        </div>
+
+        <!-- Thống kê -->
+        <!-- <div class="form-section">
+            <h2>📊 Thống Kê Phả Hệ</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-label">Tổng thành viên</div>
+                    <div class="stat-value" id="totalMembers">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Nam còn sống</div>
+                    <div class="stat-value" id="maleCount">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Nữ còn sống</div>
+                    <div class="stat-value" id="femaleCount">0</div>
+                </div>
+
+                <div class="stat-item">
+                    <div class="stat-label">Đã mất</div>
+                    <div class="stat-value" id="deceasedCount">0</div>
+                </div>
+                
+                <div class="stat-item">
+                    <div class="stat-label">Số thế hệ</div>
+                    <div class="stat-value" id="generationCount">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">0-15 tuổi</div>
+                    <div class="stat-value" id="ageGroup1">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">16-64 tuổi</div>
+                    <div class="stat-value" id="ageGroup2">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">≥ 65 tuổi</div>
+                    <div class="stat-value" id="ageGroup3">0</div>
+                </div>
+            </div>
+        </div>
+    </div> -->
+
+    <!-- Phần quản trị - hiển thị sau khi đăng nhập -->
+    <div class="admin-section">
+        <div class="container">
+            <!-- Hiển thị khi chưa đăng nhập -->
+            <div id="loginPrompt" class="admin-login-prompt">
+                <h2>🔐 Chế Độ Quản Trị</h2>
+                <button class="btn-login" onclick="showLoginForm()">Đăng Nhập Quản Trị</button>
+            </div>
+
+            <!-- Form đăng nhập inline -->
+            <div id="loginForm" style="display: none;" class="admin-login-prompt">
+                <h2>🔐 Đăng Nhập </h2>
+                <p style="font-size: 13px; color: #999;">Sử dụng email và mật khẩu </p>
+                <div id="loginError" style="display: none; color: #f44336; margin-bottom: 15px; font-weight: 600;"></div>
+                <div id="loginSuccess" style="display: none; color: #4CAF50; margin-bottom: 15px; font-weight: 600;"></div>
+                <form onsubmit="handleFirebaseLogin(event)" style="max-width: 400px; margin: 0 auto;">
+                    <div class="form-group" style="text-align: left;">
+                        <label for="loginEmail">Email:</label>
+                        <input type="email" id="loginEmail" required autocomplete="email" placeholder="admin@example.com" style="width: 100%;">
+                    </div>
+                    <div class="form-group" style="text-align: left;">
+                        <label for="loginPassword">Mật khẩu:</label>
+                        <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="Nhập mật khẩu..." style="width: 100%;">
+                    </div>
+                    <button type="submit" class="btn-primary" id="loginBtn" style="width: 100%; margin-top: 10px;">
+                        <span id="loginBtnText">Đăng Nhập</span>
+                        <span id="loginBtnLoading" style="display: none;">⏳ Đang đăng nhập...</span>
+                    </button>
+                    <button type="button" class="btn-secondary" style="width: 100%; margin-top: 10px;" onclick="cancelLogin()">Hủy</button>
+                </form>
+            </div>
+
+            <!-- Phần quản trị - hiển thị sau khi đăng nhập -->
+            <div id="adminControls" class="admin-controls">
+                <div class="admin-header">
+                    <div>
+                        <h2>⚙️ Quản Trị Phả Hệ</h2>
+                        <div id="userEmail" style="font-size: 14px; opacity: 0.9; margin-top: 5px;"></div>
+                    </div>
+                    <button class="btn-logout" onclick="handleLogout()">🚪 Đăng Xuất</button>
+                </div>
+                
+                <div class="controls-panel" style="margin-top: 0; padding-top: 20px;">
+                    <div class="form-section">
+                        <h2>Thêm Thành Viên</h2>
+                        <form id="addMemberForm">
+                            <div class="form-group">
+                                <label for="memberName">Họ và tên:</label>
+                                <input type="text" id="memberName" required autocomplete="off" maxlength="30">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="memberGender">Giới tính:</label>
+                                <select id="memberGender" required>
+                                    <option value="male">Nam</option>
+                                    <option value="female">Nữ</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="birthYear">Năm sinh:</label>
+                                <input type="text" id="birthYear" placeholder="" autocomplete="off" maxlength="4">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="deathYear">Năm mất:</label>
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                    <input type="checkbox" id="isDeceased" style="width: auto; margin: 0;">
+                                    <label for="isDeceased" style="margin: 0; cursor: pointer;">Đã mất</label>
+                                </div>
+                                <input type="text" id="deathYear" placeholder="Nhập năm mất..." autocomplete="off" maxlength="4">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="hometown">Quê quán:</label>
+                                <input type="text" id="hometown" placeholder="Nhập quê quán..." autocomplete="off" maxlength="50">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="parentId">Chọn cha/mẹ:</label>
+                                <div class="searchable-select" id="parentSelectContainer">
+                                    <input type="text" class="select-search" id="parentSearch" placeholder="Tìm hoặc chọn..." autocomplete="off">
+                                    <div class="select-options" id="parentOptions"></div>
+                                </div>
+                                <input type="hidden" id="parentId">
+                                <div id="childrenInfo" style="margin-top: 8px; font-size: 0.85rem; color: var(--text-secondary); font-style: italic;"></div>
+                            </div>
+
+                            <div class="form-group" id="childOrderGroup" style="display: none;">
+                                <label for="childOrder">Là con thứ:</label>
+                                <select id="childOrder">
+                                    <option value="">-- Chọn thứ tự --</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group" id="spouseParentGroup" style="display: none;" autocomplete="off">
+                                <label for="spouseParentId">Là con của (Cha/Mẹ):</label>
+                                <div class="searchable-select" id="spouseParentSelectContainer">
+                                    <input type="text" class="select-search" id="spouseParentSearch" placeholder="Chọn vợ/chồng của người đã chọn ở trên..."autocomplete="off">
+                                    <div class="select-options" id="spouseParentOptions"></div>
+                                </div>
+                                <input type="hidden" id="spouseParentId">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="notes">Ghi chú:</label>
+                                <textarea id="notes" rows="3" placeholder="Tối đa 250 ký tự." autocomplete="off" maxlength="250"></textarea>
+                            </div>
+
+                            <button type="submit" class="btn-primary">Thêm thành viên</button>
+                        </form>
+                    </div>
+
+                    <div class="form-section">
+                        <h2>Thêm Vợ/Chồng</h2>
+                        <form id="addSpouseForm">
+                            <div class="form-group">
+                                <label for="spouseMemberId">Chọn thành viên:</label>
+                                <div class="searchable-select" id="spouseMemberSelectContainer">
+                                    <input type="text" class="select-search" id="spouseMemberSearch" placeholder="Tìm hoặc chọn..." autocomplete="off">
+                                    <div class="select-options" id="spouseMemberOptions"></div>
+                                </div>
+                                <input type="hidden" id="spouseMemberId">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="spouseName">Tên vợ/chồng:</label>
+                                <input type="text" id="spouseName" required autocomplete="off" maxlength="30">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="spouseBirthYear">Năm sinh:</label>
+                                <input type="text" id="spouseBirthYear" autocomplete="off" maxlength="4">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="spouseDeathYear">Năm mất:</label>
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                    <input type="checkbox" id="spouseIsDeceased" style="width: auto; margin: 0;">
+                                    <label for="spouseIsDeceased" style="margin: 0; cursor: pointer;">Đã mất</label>
+                                </div>
+                                <input type="text" id="spouseDeathYear" autocomplete="off" maxlength="4" placeholder="Nhập năm mất...">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="spouseHometown">Quê quán:</label>
+                                <input type="text" id="spouseHometown" placeholder="Nhập quê quán..." autocomplete="off" maxlength="50">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="spouseOrder">Là vợ/chồng thứ:</label>
+                                <select id="spouseOrder">
+                                    <option value="">-- Chọn thứ tự --</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="spouseNotes">Ghi chú:</label>
+                                <textarea id="spouseNotes" rows="3" placeholder="Tối đa 250 ký tự." autocomplete="off" maxlength="250"></textarea>
+                            </div>
+
+                            <button type="submit" class="btn-secondary">Thêm vợ/chồng</button>
+                        </form>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button id="resetBtn" class="btn-danger">Xóa toàn bộ dữ liệu</button>
+                        <button id="exportBtn" class="btn-info">Xuất dữ liệu</button>
+                        <button id="importBtn" class="btn-info">Nhập dữ liệu</button>
+                        <input type="file" id="importFile" accept=".json" style="display: none;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Sửa Thông Tin</h2>
+            <form id="editMemberForm">
+                <input type="hidden" id="editMemberId">
+                <div class="form-group">
+                    <label for="editMemberName">Họ và tên:</label>
+                    <input type="text" id="editMemberName" required maxlength="30" autocomplete="off">
+                </div>
+                
+                <div class="form-group">
+                    <label for="editMemberGender">Giới tính:</label>
+                    <select id="editMemberGender" required>
+                        <option value="male">Nam</option>
+                        <option value="female">Nữ</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="editBirthYear">Năm sinh:</label>
+                    <input type="text" id="editBirthYear" maxlength="4" autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="editDeathYear">Năm mất:</label>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                        <input type="checkbox" id="editIsDeceased" style="width: auto; margin: 0;">
+                        <label for="editIsDeceased" style="margin: 0; cursor: pointer;">Đã mất</label>
+                    </div>
+                    <input type="text" id="editDeathYear" maxlength="4" placeholder="Nhập năm mất..."autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="editHometown">Quê quán:</label>
+                    <input type="text" id="editHometown" placeholder="Nhập quê quán..." autocomplete="off" maxlength="50">
+                </div>
+
+                <div class="form-group">
+                    <label for="editParentId">Chọn Cha/Mẹ:</label>
+                    <div class="searchable-select" id="editParentSelectContainer">
+                        <input type="text" class="select-search" id="editParentSearch" placeholder="Tìm hoặc chọn..." autocomplete="off">
+                        <div class="select-options" id="editParentOptions"></div>
+                    </div>
+                    <input type="hidden" id="editParentId">
+                </div>
+
+                <div class="form-group" id="editChildOrderGroup" style="display: none;">
+                    <label for="editChildOrder">Là con thứ:</label>
+                    <select id="editChildOrder">
+                        <option value="">-- Chọn thứ tự --</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="editSpouseParentGroup" style="display: none;">
+                    <label for="editSpouseParentId">Là con của (Cha/Mẹ):</label>
+                    <div class="searchable-select" id="editSpouseParentSelectContainer">
+                        <input type="text" class="select-search" id="editSpouseParentSearch" placeholder="Chọn vợ/chồng của người đã chọn ở trên..." autocomplete="off">
+                        <div class="select-options" id="editSpouseParentOptions"></div>
+                    </div>
+                    <input type="hidden" id="editSpouseParentId">
+                </div>
+
+                <div class="form-group">
+                    <label for="editNotes">Ghi chú:</label>
+                    <textarea id="editNotes" rows="3" placeholder="Tối đa 250 ký tự." maxlength="250" autocomplete="off"></textarea>
+                </div>
+
+                <button type="submit" class="btn-primary">Cập nhật</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Spouse Modal -->
+    <div id="editSpouseModal" class="modal">
+        <div class="modal-content">
+            <span class="close-spouse-modal">&times;</span>
+            <h2>Sửa Thông Tin Vợ/Chồng</h2>
+            <form id="editSpouseForm">
+                <input type="hidden" id="editSpouseMemberId">
+                <input type="hidden" id="editSpouseIndex">
+                
+                <div class="form-group">
+                    <label for="editSpouseNameInput">Họ và tên:</label>
+                    <input type="text" id="editSpouseNameInput" required maxlength="30" autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="editSpouseBirthYear">Năm sinh:</label>
+                    <input type="text" id="editSpouseBirthYear" maxlength="4" autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="editSpouseDeathYear">Năm mất:</label>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                        <input type="checkbox" id="editSpouseIsDeceased" style="width: auto; margin: 0;">
+                        <label for="editSpouseIsDeceased" style="margin: 0; cursor: pointer;">Đã mất</label>
+                    </div>
+                    <input type="text" id="editSpouseDeathYear" maxlength="4" placeholder="Nhập năm mất..." autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="editSpouseHometown">Quê quán:</label>
+                    <input type="text" id="editSpouseHometown" placeholder="Nhập quê quán..." autocomplete="off" maxlength="50">
+                </div>
+
+                <div class="form-group">
+                    <label for="editSpouseOrder">Là vợ/chồng thứ:</label>
+                    <select id="editSpouseOrder">
+                        <option value="">-- Chọn thứ tự --</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="editSpouseNotes">Ghi chú:</label>
+                    <textarea id="editSpouseNotes" rows="3" placeholder="Tối đa 250 ký tự." maxlength="250" autocomplete="off"></textarea>
+                </div>
+                
+                <button type="submit" class="btn-primary">Cập nhật</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content detail-modal-content">
+            <span class="close-detail-modal">&times;</span>
+            <h2>Thông Tin Chi Tiết</h2>
+            <div id="detailContent"></div>
+        </div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script src="firebase-api.js"></script>
+    <script src="script.js"></script>
+    <script src="script-firebase.js"></script>
+    <script>
+        // Hàm hiển thị form đăng nhập
+        function showLoginForm() {
+            document.getElementById('loginPrompt').style.display = 'none';
+            document.getElementById('loginForm').style.display = 'block';
+        }
+
+        // Hàm hủy đăng nhập
+        function cancelLogin() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('loginPrompt').style.display = 'block';
+            document.getElementById('loginError').style.display = 'none';
+        }
+
+        // Hàm xử lý đăng nhập với Firebase Authentication
+        async function handleFirebaseLogin(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+            const successDiv = document.getElementById('loginSuccess');
+            const loginBtn = document.getElementById('loginBtn');
+            const loginBtnText = document.getElementById('loginBtnText');
+            const loginBtnLoading = document.getElementById('loginBtnLoading');
+
+            // Ẩn thông báo cũ
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+
+            // Hiển thị loading
+            loginBtnText.style.display = 'none';
+            loginBtnLoading.style.display = 'inline';
+            loginBtn.disabled = true;
+
+            try {
+                // Đăng nhập Firebase
+                const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+                
+                console.log('✅ Đăng nhập thành công:', user.email);
+
+                // Hiển thị thông báo thành công
+                successDiv.textContent = '✅ Đăng nhập thành công! Đang tải...';
+                successDiv.style.display = 'block';
+
+                // Lưu trạng thái đăng nhập
+                sessionStorage.setItem('isLoggedIn', 'true');
+                sessionStorage.setItem('loginTime', new Date().getTime());
+                sessionStorage.setItem('userEmail', user.email);
+                
+                // Delay để hiển thị thông báo thành công
+                setTimeout(() => {
+                    // Ẩn form đăng nhập
+                    document.getElementById('loginForm').style.display = 'none';
+                    
+                    // Hiển thị phần quản trị
+                    document.getElementById('adminControls').classList.add('show');
+                    
+                    // Hiển thị email người dùng
+                    const userEmailDiv = document.getElementById('userEmail');
+                    if (userEmailDiv) {
+                        userEmailDiv.textContent = `👤 Đang đăng nhập: ${user.email}`;
+                    }
+                    
+                    // Hiển thị nút undo/redo
+                    const undoBtn = document.getElementById('undoBtn');
+                    const redoBtn = document.getElementById('redoBtn');
+                    if (undoBtn) undoBtn.style.display = 'inline-block';
+                    if (redoBtn) redoBtn.style.display = 'inline-block';
+                    
+                    // Reset form
+                    document.getElementById('loginEmail').value = '';
+                    document.getElementById('loginPassword').value = '';
+                    
+                    // ✅ Re-render tree để hiện nút Edit/Delete
+                    if (window.familyTree && typeof window.familyTree.renderTree === 'function') {
+                        window.familyTree.renderTree();
+                    }
+                    
+                    // Scroll xuống phần quản trị
+                    setTimeout(() => {
+                        document.getElementById('adminControls').scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'start' 
+                        });
+                    }, 100);
+
+                    // Reset button state
+                    loginBtnText.style.display = 'inline';
+                    loginBtnLoading.style.display = 'none';
+                    loginBtn.disabled = false;
+                }, 800);
+
+            } catch (error) {
+                console.error('❌ Lỗi đăng nhập:', error);
+                
+                // Hiển thị thông báo lỗi
+                let errorMessage = '❌ Đăng nhập thất bại!';
+                
+                switch(error.code) {
+                    case 'auth/invalid-email':
+                        errorMessage = '❌ Email không hợp lệ!';
+                        break;
+                    case 'auth/user-disabled':
+                        errorMessage = '❌ Tài khoản đã bị vô hiệu hóa!';
+                        break;
+                    case 'auth/user-not-found':
+                        errorMessage = '❌ Không tìm thấy tài khoản với email này!';
+                        break;
+                    case 'auth/wrong-password':
+                        errorMessage = '❌ Mật khẩu không đúng!';
+                        break;
+                    case 'auth/invalid-credential':
+                        errorMessage = '❌ Email hoặc mật khẩu không đúng!';
+                        break;
+                    case 'auth/network-request-failed':
+                        errorMessage = '❌ Lỗi kết nối mạng! Kiểm tra internet của bạn.';
+                        break;
+                    case 'auth/too-many-requests':
+                        errorMessage = '❌ Quá nhiều lần đăng nhập thất bại! Vui lòng thử lại sau.';
+                        break;
+                    default:
+                        errorMessage = `❌ Lỗi: ${error.message}`;
+                }
+                
+                errorDiv.textContent = errorMessage;
+                errorDiv.style.display = 'block';
+                
+                // Reset button state
+                loginBtnText.style.display = 'inline';
+                loginBtnLoading.style.display = 'none';
+                loginBtn.disabled = false;
+                
+                // Clear password
+                document.getElementById('loginPassword').value = '';
+            }
+        }
+
+        // Hàm đăng xuất với Firebase
+        async function handleLogout() {
+            if (confirm('Bạn có chắc muốn đăng xuất?')) {
+                try {
+                    // Đăng xuất Firebase
+                    await firebase.auth().signOut();
+                    console.log('✅ Đã đăng xuất Firebase');
+                    
+                    // Xóa session storage
+                    sessionStorage.removeItem('isLoggedIn');
+                    sessionStorage.removeItem('loginTime');
+                    sessionStorage.removeItem('userEmail');
+                    
+                    // Ẩn phần quản trị
+                    document.getElementById('adminControls').classList.remove('show');
+                    document.getElementById('loginPrompt').style.display = 'block';
+                    
+                    // Ẩn nút undo/redo
+                    const undoBtn = document.getElementById('undoBtn');
+                    const redoBtn = document.getElementById('redoBtn');
+                    if (undoBtn) undoBtn.style.display = 'none';
+                    if (redoBtn) redoBtn.style.display = 'none';
+                    
+                    // ✅ Re-render tree để ẩn nút Edit/Delete
+                    if (window.familyTree && typeof window.familyTree.renderTree === 'function') {
+                        window.familyTree.renderTree();
+                    }
+                    
+                    // Scroll lên phần admin section
+                    document.querySelector('.admin-section').scrollIntoView({ behavior: 'smooth' });
+                    
+                    alert('✅ Đã đăng xuất thành công!');
+                } catch (error) {
+                    console.error('❌ Lỗi đăng xuất:', error);
+                    alert('❌ Lỗi khi đăng xuất: ' + error.message);
+                }
+            }
+        }
+
+        // Kiểm tra trạng thái đăng nhập khi tải trang
+        window.addEventListener('load', function() {
+            // Lắng nghe thay đổi trạng thái đăng nhập Firebase
+            firebase.auth().onAuthStateChanged((user) => {
+                if (user) {
+                    // User đã đăng nhập
+                    console.log('✅ User đã đăng nhập:', user.email);
+                    
+                    // Lưu session
+                    sessionStorage.setItem('isLoggedIn', 'true');
+                    sessionStorage.setItem('loginTime', new Date().getTime());
+                    sessionStorage.setItem('userEmail', user.email);
+                    
+                    // Hiển thị phần quản trị
+                    document.getElementById('loginPrompt').style.display = 'none';
+                    document.getElementById('loginForm').style.display = 'none';
+                    document.getElementById('adminControls').classList.add('show');
+                    
+                    // Hiển thị email
+                    const userEmailDiv = document.getElementById('userEmail');
+                    if (userEmailDiv) {
+                        userEmailDiv.textContent = `👤 Đang đăng nhập: ${user.email}`;
+                    }
+                    
+                    // Hiển thị nút undo/redo
+                    const undoBtn = document.getElementById('undoBtn');
+                    const redoBtn = document.getElementById('redoBtn');
+                    if (undoBtn) undoBtn.style.display = 'inline-block';
+                    if (redoBtn) redoBtn.style.display = 'inline-block';
+                } else {
+                    // User chưa đăng nhập
+                    console.log('ℹ️ User chưa đăng nhập');
+                    
+                    // Xóa session
+                    sessionStorage.removeItem('isLoggedIn');
+                    sessionStorage.removeItem('loginTime');
+                    sessionStorage.removeItem('userEmail');
+                    
+                    // Hiển thị nút đăng nhập
+                    document.getElementById('loginPrompt').style.display = 'block';
+                    document.getElementById('loginForm').style.display = 'none';
+                    document.getElementById('adminControls').classList.remove('show');
+                    
+                    // Ẩn nút undo/redo
+                    const undoBtn = document.getElementById('undoBtn');
+                    const redoBtn = document.getElementById('redoBtn');
+                    if (undoBtn) undoBtn.style.display = 'none';
+                    if (redoBtn) redoBtn.style.display = 'none';
+                }
+            });
+        });
+
+        
+        // Firebase connection checker (chỉ log, không hiển thị UI)
+        function checkFirebaseConnection() {
+            const connectedRef = firebase.database().ref('.info/connected');
+            connectedRef.on('value', (snapshot) => {
+                if (snapshot.val() === true) {
+                    console.log('✅ Firebase connected');
+                } else {
+                    console.log('⚠️ Firebase disconnected');
+                }
+            });
+        }
+        
+        // Show sync indicator
+        function showSyncIndicator() {
+            const indicator = document.getElementById('syncIndicator');
+            if (indicator) {
+                indicator.style.display = 'block';
+                setTimeout(() => {
+                    indicator.style.display = 'none';
+                }, 2000);
+            }
+        }
+        
+        // Initialize on load
+        window.addEventListener('load', () => {
+            checkFirebaseConnection();
+        });
+
+    </script>
+</body>
+</html>
