@@ -1565,9 +1565,17 @@ class FamilyTree {
         
         this.members = this.members.filter(m => m.spouseOf != memberId);
         
-        // ✅ XÓA MEMBER KHỎI FIREBASE
-        if (this.deleteMemberFromFirebase) {
-            this.deleteMemberFromFirebase(member.id);
+        // ✅ XÓA KHỎI FIREBASE - Phân biệt member và spouse
+        if (member.isSpouse) {
+            // Nếu đang xóa spouse, gọi deleteSpouseFromFirebase
+            if (this.deleteSpouseFromFirebase) {
+                this.deleteSpouseFromFirebase(member.id);
+            }
+        } else {
+            // Nếu đang xóa member, gọi deleteMemberFromFirebase
+            if (this.deleteMemberFromFirebase) {
+                this.deleteMemberFromFirebase(member.id);
+            }
         }
         
         // Xóa người này
