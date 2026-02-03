@@ -827,7 +827,7 @@ button {
 }
 /* Detail Modal */
 .detail-modal-content {
-    max-height: 80vh;
+    max-height: 95vh;
     overflow-y: auto;
 }
 
